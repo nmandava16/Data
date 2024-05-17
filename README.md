@@ -1,5 +1,18 @@
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import @RestController
+@RequestMapping("/api/dealers")
+public class CostAndGrossController {
+
+    @Autowired
+    private DealerService dealerService;
+
+    @PostMapping(value = "/{dealerId}/marketing/leads", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> saveCostAndGrossForLeads(
+            @RequestBody DealerCostAndGross dealerRequest,
+            @PathVariable("dealerId") int dealerId) {
+        return dealerService.processDealerData(dealerId, dealerRequest);
+    }
+}org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.ResponseEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
