@@ -17,11 +17,14 @@ public class CostAndGrossControllerTest {
     @MockBean
     private DealerService dealerService; // Assuming DealerService is the service used in your controller
 
+    private DealerCostAndGrossResponse mockResponse;
+
     @BeforeEach
     public void setup() {
-        // Mock the dependencies here if required
-        DealerCostAndGrossResponse mockResponse = new DealerCostAndGrossResponse();
-        // Set up your mockResponse as needed
+        // Setup mock data or interactions
+        mockResponse = new DealerCostAndGrossResponse();
+        // Configure the mock to return specific values
+        mockResponse.setSomeField("expectedValue");
 
         int dealerId = 1;
         String month = "May";
@@ -29,7 +32,8 @@ public class CostAndGrossControllerTest {
         int offset = 0;
         int limit = 10;
 
-        when(dealerService.getDealerWithLeads(dealerId, month, year, offset, limit)).thenReturn(mockResponse);
+        when(dealerService.getDealerWithLeads(dealerId, month, year, offset, limit))
+            .thenReturn(mockResponse);
     }
 
     @Test
@@ -40,7 +44,6 @@ public class CostAndGrossControllerTest {
                 .param("offset", "0")
                 .param("limit", "10"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.someField").value("expectedValue")); // Adjust based on actual response structure
+            .andExpect(jsonPath("$.someField").value("expectedValue")); // Adjust based on actual JSON response structure
     }
 }
-
