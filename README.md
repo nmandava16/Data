@@ -7,14 +7,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.sql.Timestamp;
 import java.util.List;
 import java.util.Arrays;
 
 public class DealerServiceTest {
 
     @Mock
-    private CostAndGrossDetailsRepository repository; // Ensure this is the correct repository interface
+    private CostAndGrossDetailsRepository repository; 
 
     @InjectMocks
     private DealerService service;
@@ -27,41 +26,42 @@ public class DealerServiceTest {
     @Test
     public void testGetDealerWithLeads() {
         // Arrange
-        Long dealerId = TestData.DEALER_ID;
-        String month = "May";
-        Integer year = 2023;
+        int internalDealerId = 1;
+        String reportMonth = "May";
+        int reportYear = 2023;
+        int offset = 0;
+        int limit = 10;
 
-        DealerLeadSourceCostAndGrossEntity entity1 = createEntity(dealerId, "Online", month, 100.00, 150.00, 50.00, 10);
-        DealerLeadSourceCostAndGrossEntity entity2 = createEntity(dealerId, "Referral", month, 200.00, 250.00, 100.00, 20);
+        DealerLeadSourceCostAndGrossEntity entity1 = new DealerLeadSourceCostAndGrossEntity();
+        entity1.setInternalDealerId(internalDealerId);
+        entity1.setModifiedLeadSource("Online");
+        entity1.setMonth(reportMonth);
+        entity1.setCost(100.00);
+        entity1.setGross(150.00);
+        entity1.setNet(50.00);
+        entity1.setNumberOfSales(10);
 
-        List<DealerLeadSourceCostAndGrossEntity> expectedEntities = Arrays.asList(entity1, entity2);
+        DealerLeadSourceCostAndGrossEntity entity2 = new DealerLeadSourceCostAndGrossEntity();
+        entity2.setInternalDealerId(internalDealerId);
+        entity2.setModifiedLeadSource("Referral");
+        entity2.setMonth(reportMonth);
+        entity2.setCost(200.00);
+        entity2.setGross(250.00);
+        entity2.setNet(100.00);
+        entity2.setNumberOfSales(20);
 
-        when(repository.findCostAndGrossByDealerIdAndMonth(dealerId, month, year))
-            .thenReturn(expectedEntities);
+        List<DealerLeadSourceCostAndGrossEntity> entities = Arrays.asList(entity1, entity2);
+
+        when(repository.findCostAndGrossByInternalDealerIdAndReportMonth(internalDealerId, reportMonth))
+            .thenReturn(entities);
 
         // Act
-        List<DealerLeadSourceCostAndGrossEntity> actualEntities = service.getDealerWithLeads(dealerId, month, year);
+        DealerCostAndGrossResponse response = service.getDealerWithLeads(internalDealerId, reportMonth, reportYear, offset, limit);
 
         // Assert
-        assertNotNull(actualEntities, "The returned list should not be null.");
-        assertEquals(expectedEntities.size(), actualEntities.size(), "The number of entities should match.");
-        assertTrue(actualEntities.containsAll(expectedEntities), "The actual list should contain all the expected entities.");
-        verify(repository, times(1)).findCostAndGrossByDealerIdAndMonth(dealerId, month, year);
-    }
-
-    private DealerLeadSourceCostAndGrossEntity createEntity(Long dealerId, String leadSource, String month, double cost, double gross, double net, long sales) {
-        DealerLeadSourceCostAndGrossEntity entity = new DealerLeadSourceCostAndGrossEntity();
-        entity.setInternalDealerId(dealerId);
-        entity.setModifiedLeadSource(leadSource);
-        entity.setMonth(month);
-        entity.setCost(cost);
-        entity.setGross(gross);
-        entity.setNet(net);
-        entity.setNumberOfSales(sales);
-        entity.setCreatedDate(new Timestamp(System.currentTimeMillis()));
-        entity.setUpdatedDate(new Timestamp(System.currentTimeMillis()));
-        entity.setUserUpdated("testUser");
-        entity.setVersionNumber(1);
-        return entity;
+        assertNotNull(response, "The response should not be null.");
+        assertNotNull(response.getLeadSources(), "Lead sources should not be null.");
+        assertEquals(2, response.getLeadSources().size(), "Should return 2 leads.");
+        assertTrue(response.getPagination().getCount() == 2, "Pagination count should match the number of records.");
     }
 }
