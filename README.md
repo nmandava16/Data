@@ -1,67 +1,54 @@
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.*;
 import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
-import java.util.Arrays;
+@WebMvcTest(CostAndGrossController.class)
+public class CostAndGrossControllerTest {
 
-public class DealerServiceTest {
+    @Autowired
+    private MockMvc mockMvc;
 
-    @Mock
-    private CostAndGrossDetailsRepository repository; 
-
-    @InjectMocks
-    private DealerService service;
+    @MockBean
+    private DealerService dealerService;  // Assuming DealerService is used in your controller
 
     @BeforeEach
-    public void init() {
-        MockitoAnnotations.openMocks(this);
+    void setUp() {
+        // Mock setup can be done here if needed for each test
     }
 
     @Test
-    public void testGetDealerWithLeads() {
-        // Arrange
-        int internalDealerId = 1;
-        String reportMonth = "May";
-        int reportYear = 2023;
+    void testGetCostAndGrossForLeads() throws Exception {
+        int dealerId = 1;
+        String month = "May";
+        int year = 2023;
         int offset = 0;
         int limit = 10;
 
-        DealerLeadSourceCostAndGrossEntity entity1 = new DealerLeadSourceCostAndGrossEntity();
-        entity1.setInternalDealerId(internalDealerId);
-        entity1.setModifiedLeadSource("Online");
-        entity1.setMonth(reportMonth);
-        entity1.setCost(100.00);
-        entity1.setGross(150.00);
-        entity1.setNet(50.00);
-        entity1.setNumberOfSales(10);
+        DealerCostAndGrossResponse mockResponse = new DealerCostAndGrossResponse();
+        // setup your mock response
 
-        DealerLeadSourceCostAndGrossEntity entity2 = new DealerLeadSourceCostAndGrossEntity();
-        entity2.setInternalDealerId(internalDealerId);
-        entity2.setModifiedLeadSource("Referral");
-        entity2.setMonth(reportMonth);
-        entity2.setCost(200.00);
-        entity2.setGross(250.00);
-        entity2.setNet(100.00);
-        entity2.setNumberOfSales(20);
+        when(dealerService.getDealerWithLeads(dealerId, month, year, offset, limit))
+            .thenReturn(mockResponse);
 
-        List<DealerLeadSourceCostAndGrossEntity> entities = Arrays.asList(entity1, entity2);
+        mockMvc.perform(get("/dealer/{dealerId}/marketing/leads", dealerId)
+                .param("month", month)
+                .param("year", String.valueOf(year))
+                .param("offset", String.valueOf(offset))
+                .param("limit", String.valueOf(limit))
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.someField").value("someValue"));  // Adjust according to actual JSON response structure
 
-        when(repository.findCostAndGrossByInternalDealerIdAndReportMonth(internalDealerId, reportMonth))
-            .thenReturn(entities);
-
-        // Act
-        DealerCostAndGrossResponse response = service.getDealerWithLeads(internalDealerId, reportMonth, reportYear, offset, limit);
-
-        // Assert
-        assertNotNull(response, "The response should not be null.");
-        assertNotNull(response.getLeadSources(), "Lead sources should not be null.");
-        assertEquals(2, response.getLeadSources().size(), "Should return 2 leads.");
-        assertTrue(response.getPagination().getCount() == 2, "Pagination count should match the number of records.");
+        verify(dealerService).getDealerWithLeads(dealerId, month, year, offset, limit);
     }
 }
+        
