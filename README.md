@@ -1,83 +1,37 @@
-import org.springframework.stereotype.Service;
-import @RestController
-@RequestMapping("/api/dealers")
-public class CostAndGrossController {
+
+import com.capitolone.le.costandgross.TestData;
+import com.capitolone.le.costandgross.entity.DealerLeadSourceCostAndGrossEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+public class CostAndGrossDetailsRepositoryTest {
 
     @Autowired
-    private DealerService dealerService;
+    private TestEntityManager entityManager;
 
-    @PostMapping(value = "/{dealerId}/marketing/leads", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> saveCostAndGrossForLeads(
-            @RequestBody DealerCostAndGross dealerRequest,
-            @PathVariable("dealerId") int dealerId) {
-        return dealerService.processDealerData(dealerId, dealerRequest);
+    @Autowired
+    private CostAndGrossDetailsRepository repository;
+
+    @Test
+    public void testFindingCostAndGrossByDealerIdAndMonth() {
+        // Assuming that TestData.DEALER_COST_AND_GROSS is an entity or can be adapted to an entity
+        DealerLeadSourceCostAndGrossEntity entity = new DealerLeadSourceCostAndGrossEntity();
+        entity.setDealerId(TestData.DEALER_ID);
+        entity.setMonth("May");
+        entity.setYear(2023);
+        entityManager.persist(entity);
+        entityManager.flush();
+
+        // Retrieving from the database to verify it's correctly stored
+        DealerLeadSourceCostAndGrossEntity foundEntity = repository.findByDealerIdAndMonth(TestData.DEALER_ID, "May").get(0);
+        assertThat(foundEntity).isNotNull();
+        assertThat(foundEntity.getDealerId()).isEqualTo(entity.getDealerId());
+        assertThat(foundEntity.getMonth()).isEqualTo(entity.getMonth());
     }
-}org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.ResponseEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.ArrayList;
-import java.util.Set;
-import java.util.HashSet;
-
-@Service
-public class DealerService {
-
-    private static final Logger log = LoggerFactory.getLogger(DealerService.class);
-
-    private final CostAndGrossDetailsRepository costAndGrossDetailsRepository;
-
-    public DealerService(CostAndGrossDetailsRepository costAndGrossDetailsRepository) {
-        this.costAndGrossDetailsRepository = costAndGrossDetailsRepository;
-    }
-
-    @Transactional
-    public ResponseEntity<Void> processDealerData(int dealerId, DealerCostAndGross dealerCostAndGross) {
-        try {
-            // Add Feasible Validations
-            validateInput(dealerId, dealerCostAndGross);
-
-            List<DealerLeadSourceCostAndGrossEntity> entities = dealerCostAndGross.getLeadSources().stream()
-                    .map(lead -> mapToEntity(lead, dealerId))
-                    .collect(Collectors.toList());
-
-            // Find the events for monitoring
-            log.info("Processed {} lead sources for dealer ID {}", entities.size(), dealerId);
-
-            costAndGrossDetailsRepository.saveAll(entities);
-
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            // Handle exception, log error, etc.
-            log.error("Error while processing dealer data", e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    private void validateInput(int dealerId, DealerCostAndGross dealerCostAndGross) {
-        if (dealerCostAndGross == null || dealerCostAndGross.getLeadSources() == null || dealerCostAndGross.getLeadSources().isEmpty()) {
-            throw new IllegalArgumentException("DealerCostAndGross and its LeadSources cannot be null or empty");
-        }
-
-        if (dealerId <= 0) {
-            throw new IllegalArgumentException("Dealer ID must be a positive integer");
-        }
-
-        Set<Integer> leadSourceIds = new HashSet<>();
-        for (LeadSource lead : dealerCostAndGross.getLeadSources()) {
-            if (lead.getLeadSourceId() <= 0) {
-                throw new IllegalArgumentException("LeadSource ID must be a positive integer");
-            }
-            if (lead.getCost() < 0) {
-                throw new IllegalArgumentException("Cost cannot be negative");
-            }
-            if (lead.getGross() < 0) {
-                throw new IllegalArgumentException("Gross cannot be negative");
-            }
-            if (!leadSourceIds.add(lead.getLeadSourceId())) {
-                throw new IllegalArgumentException("Duplicate LeadSource ID found: " + lead.getLeadSourceId());
-            }
-        }
+}
