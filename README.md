@@ -81,14 +81,3 @@ public class DealerService {
                 throw new IllegalArgumentException("Duplicate LeadSource ID found: " + lead.getLeadSourceId());
             }
         }
-    }
-
-    private DealerLeadSourceCostAndGrossEntity mapToEntity(LeadSource lead, int dealerId) {
-        DealerLeadSourceCostAndGrossEntity entity = new DealerLeadSourceCostAndGrossEntity();
-        entity.setCost(lead.getCost());
-        entity.setGross(lead.getGross());
-        entity.setLeadSourceId(lead.getLeadSourceId());
-        entity.setInternalDealerId(dealerId);
-        return entity;
-    }
-}
