@@ -1,37 +1,46 @@
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-import com.capitolone.le.costandgross.TestData;
-import com.capitolone.le.costandgross.entity.DealerLeadSourceCostAndGrossEntity;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import static org.assertj.core.api.Assertions.assertThat;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-public class CostAndGrossDetailsRepositoryTest {
+public class DealerServiceTest {
 
-    @Autowired
-    private TestEntityManager entityManager;
+    @Mock
+    private CostAndGrossDetailsRepository repository; // Assuming repository has the method to fetch dealer data
 
-    @Autowired
-    private CostAndGrossDetailsRepository repository;
+    @InjectMocks
+    private DealerService service;
+
+    @BeforeEach
+    public void init() {
+        MockitoAnnotations.openMocks(this);
+    }
 
     @Test
-    public void testFindingCostAndGrossByDealerIdAndMonth() {
-        // Assuming that TestData.DEALER_COST_AND_GROSS is an entity or can be adapted to an entity
-        DealerLeadSourceCostAndGrossEntity entity = new DealerLeadSourceCostAndGrossEntity();
-        entity.setDealerId(TestData.DEALER_ID);
-        entity.setMonth("May");
-        entity.setYear(2023);
-        entityManager.persist(entity);
-        entityManager.flush();
+    public void testGetDealerWithLeads() {
+        // Arrange
+        Long dealerId = TestData.DEALER_ID;
+        String month = "May";
+        Integer year = 2023;
+        List<Lead> leads = TestData.LEAD_LIST; // Make sure this is initialized in your TestData class
 
-        // Retrieving from the database to verify it's correctly stored
-        DealerLeadSourceCostAndGrossEntity foundEntity = repository.findByDealerIdAndMonth(TestData.DEALER_ID, "May").get(0);
-        assertThat(foundEntity).isNotNull();
-        assertThat(foundEntity.getDealerId()).isEqualTo(entity.getDealerId());
-        assertThat(foundEntity.getMonth()).isEqualTo(entity.getMonth());
+        DealerCostAndGross expectedDealerCostAndGross = new DealerCostAndGross();
+        expectedDealerCostAndGross.setDealerId(dealerId);
+        expectedDealerCostAndGross.setLeadSources(leads);
+
+        when(repository.findDealerWithLeads(dealerId, month, year)).thenReturn(expectedDealerCostAndGross);
+
+        // Act
+        DealerCostAndGross actualDealerCostAndGross = service.getDealerWithLeads(dealerId, month, year);
+
+        // Assert
+        assertNotNull(actualDealerCostAndGross, "The returned dealer cost and gross should not be null.");
+        assertEquals(expectedDealerCostAndGross.getDealerId(), actualDealerCostAndGross.getDealerId(), "Dealer IDs should match.");
+        assertEquals(expectedDealerCostAndGross.getLeadSources().size(), actualDealerCostAndGross.getLeadSources().size(), "Number of leads should match.");
+        verify(repository, times(1)).findDealerWithLeads(dealerId, month, year);
     }
 }
