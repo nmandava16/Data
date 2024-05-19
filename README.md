@@ -7,10 +7,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.sql.Timestamp;
+import java.util.List;
+import java.util.Arrays;
+
 public class DealerServiceTest {
 
     @Mock
-    private CostAndGrossDetailsRepository repository; // Assuming repository has the method to fetch dealer data
+    private CostAndGrossDetailsRepository repository; // Ensure this is the correct repository interface
 
     @InjectMocks
     private DealerService service;
@@ -26,21 +30,38 @@ public class DealerServiceTest {
         Long dealerId = TestData.DEALER_ID;
         String month = "May";
         Integer year = 2023;
-        List<Lead> leads = TestData.LEAD_LIST; // Make sure this is initialized in your TestData class
 
-        DealerCostAndGross expectedDealerCostAndGross = new DealerCostAndGross();
-        expectedDealerCostAndGross.setDealerId(dealerId);
-        expectedDealerCostAndGross.setLeadSources(leads);
+        DealerLeadSourceCostAndGrossEntity entity1 = createEntity(dealerId, "Online", month, 100.00, 150.00, 50.00, 10);
+        DealerLeadSourceCostAndGrossEntity entity2 = createEntity(dealerId, "Referral", month, 200.00, 250.00, 100.00, 20);
 
-        when(repository.findDealerWithLeads(dealerId, month, year)).thenReturn(expectedDealerCostAndGross);
+        List<DealerLeadSourceCostAndGrossEntity> expectedEntities = Arrays.asList(entity1, entity2);
+
+        when(repository.findCostAndGrossByDealerIdAndMonth(dealerId, month, year))
+            .thenReturn(expectedEntities);
 
         // Act
-        DealerCostAndGross actualDealerCostAndGross = service.getDealerWithLeads(dealerId, month, year);
+        List<DealerLeadSourceCostAndGrossEntity> actualEntities = service.getDealerWithLeads(dealerId, month, year);
 
         // Assert
-        assertNotNull(actualDealerCostAndGross, "The returned dealer cost and gross should not be null.");
-        assertEquals(expectedDealerCostAndGross.getDealerId(), actualDealerCostAndGross.getDealerId(), "Dealer IDs should match.");
-        assertEquals(expectedDealerCostAndGross.getLeadSources().size(), actualDealerCostAndGross.getLeadSources().size(), "Number of leads should match.");
-        verify(repository, times(1)).findDealerWithLeads(dealerId, month, year);
+        assertNotNull(actualEntities, "The returned list should not be null.");
+        assertEquals(expectedEntities.size(), actualEntities.size(), "The number of entities should match.");
+        assertTrue(actualEntities.containsAll(expectedEntities), "The actual list should contain all the expected entities.");
+        verify(repository, times(1)).findCostAndGrossByDealerIdAndMonth(dealerId, month, year);
+    }
+
+    private DealerLeadSourceCostAndGrossEntity createEntity(Long dealerId, String leadSource, String month, double cost, double gross, double net, long sales) {
+        DealerLeadSourceCostAndGrossEntity entity = new DealerLeadSourceCostAndGrossEntity();
+        entity.setInternalDealerId(dealerId);
+        entity.setModifiedLeadSource(leadSource);
+        entity.setMonth(month);
+        entity.setCost(cost);
+        entity.setGross(gross);
+        entity.setNet(net);
+        entity.setNumberOfSales(sales);
+        entity.setCreatedDate(new Timestamp(System.currentTimeMillis()));
+        entity.setUpdatedDate(new Timestamp(System.currentTimeMillis()));
+        entity.setUserUpdated("testUser");
+        entity.setVersionNumber(1);
+        return entity;
     }
 }
