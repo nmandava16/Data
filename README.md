@@ -51,9 +51,18 @@ public class DealerServiceImpl implements DealerService {
             );
 
             return response.getBody();
+        } catch (HttpClientErrorException e) {
+            // Log the exception and return a specific response
+            log.error("Client error occurred while processing the request: {}", e.getMessage());
+            throw new CustomClientException("Client error: " + e.getMessage(), e.getStatusCode());
+        } catch (HttpServerErrorException e) {
+            // Log the exception and return a specific response
+            log.error("Server error occurred while processing the request: {}", e.getMessage());
+            throw new CustomServerException("Server error: " + e.getMessage(), e.getStatusCode());
         } catch (Exception e) {
-            // Handle exception (e.g., log it and return a suitable response or rethrow it)
-            return null;
+            // Log the exception and return a generic response
+            log.error("An unexpected error occurred: {}", e.getMessage());
+            throw new CustomGenericException("An unexpected error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
