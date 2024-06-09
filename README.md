@@ -37,8 +37,14 @@ public class DealerServiceImpl implements DealerService {
             CommonUtil.setHeaders(headers);
             HttpEntity<?> entity = new HttpEntity<>(headers);
 
+            String url = serviceUrlBuilder.build(Constants.COSTANDGROSSGET, dealerId) +
+                         "?month=" + month +
+                         "&year=" + year +
+                         "&offset=" + offset +
+                         "&limit=" + limit;
+
             ResponseEntity<DealerCostAndGrossResponse> response = oAuth2RestTemplate.exchange(
-                serviceUrlBuilder.build(Constants.COSTANDGROSSSET, dealerId, month, year, offset, limit),
+                url,
                 HttpMethod.GET,
                 entity,
                 DealerCostAndGrossResponse.class
