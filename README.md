@@ -1,102 +1,53 @@
-@RestController
-@RequestMapping("/api/dealers")
-public class CostAndGrossController {
+@Service
+public class DealerServiceImpl implements DealerService {
 
     @Autowired
-    private DealerService dealerService;
+    @Qualifier("oAuth2RestTemplate")
+    private RestTemplate oAuth2RestTemplate;
 
-    @PostMapping(value = "/{dealerId}/marketing/leads", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> saveCostAndGrossForLeads(
-            @RequestBody DealerCostAndGross dealerRequest,
-            @PathVariable("dealerId") int dealerId) {
-        return dealerService.processDealerData(dealerId, dealerRequest);
-    }
-}
+    @Autowired
+    private ServiceUrlBuilder serviceUrlBuilder;
 
-
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.context.request.WebRequest;
-
-@ControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<String> handleException(Exception ex, WebRequest request) {
-        return new ResponseEntity<>("An internal error occurred. Please try again later.", HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-}
-
-
-
-import org.springframework.http.ResponseEntity;
-
-public class DealerService {
-
-    @Transactional
-    public ResponseEntity<Void> processDealerData(int dealerId, DealerCostAndGross dealerCostAndGross) {
+    @Override
+    public ResponseEntity<String> processDealerData(int dealerId, DealerCostAndGross dealerRequest) {
         try {
-            // Add Feasible Validations
-            validateInput(dealerId, dealerCostAndGross);
+            HttpHeaders headers = new HttpHeaders();
+            CommonUtil.setHeaders(headers);
+            HttpEntity<DealerCostAndGross> entity = new HttpEntity<>(dealerRequest, headers);
 
-            List<DealerLeadSourceCostAndGrossEntity> entities = dealerCostAndGross.getLeadSources().stream()
-                    .map(lead -> mapToEntity(lead, dealerId))
-                    .collect(Collectors.toList());
+            ResponseEntity<String> response = oAuth2RestTemplate.exchange(
+                serviceUrlBuilder.build(Constants.COSTANDGROSS, dealerId),
+                HttpMethod.POST,
+                entity,
+                String.class
+            );
 
-            // Find the events for monitoring
-            log.info("Processed {} lead sources for dealer ID {}", entities.size(), dealerId);
-
-            costAndGrossDetailsRepository.saveAll(entities);
-
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            log.error("Error while processing dealer data", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return new ResponseEntity<>(response.getBody(), response.getStatusCode());
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
+            return new ResponseEntity<>(e.getResponseBodyAsString(), e.getStatusCode());
         } catch (Exception e) {
-            log.error("Error while processing dealer data", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return new ResponseEntity<>("An error occurred while processing the request.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    private void validateInput(int dealerId, DealerCostAndGross dealerCostAndGross) {
-        if (dealerCostAndGross == null || dealerCostAndGross.getLeadSources() == null || dealerCostAndGross.getLeadSources().isEmpty()) {
-            throw new IllegalArgumentException("DealerCostAndGross and its LeadSources cannot be null or empty");
-        }
+    @Override
+    public DealerCostAndGrossResponse getDealerWithLeads(int dealerId, String month, Integer year, int offset, int limit) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            CommonUtil.setHeaders(headers);
+            HttpEntity<?> entity = new HttpEntity<>(headers);
 
-        if (dealerId <= 0) {
-            throw new IllegalArgumentException("Dealer ID must be a positive integer");
-        }
+            ResponseEntity<DealerCostAndGrossResponse> response = oAuth2RestTemplate.exchange(
+                serviceUrlBuilder.build(Constants.COSTANDGROSSSET, dealerId, month, year, offset, limit),
+                HttpMethod.GET,
+                entity,
+                DealerCostAndGrossResponse.class
+            );
 
-        Set<Integer> leadSourceIds = new HashSet<>();
-        for (Lead lead : dealerCostAndGross.getLeadSources()) {
-            if (lead.getLeadSourceId() <= 0) {
-                throw new IllegalArgumentException("LeadSource ID must be a positive integer");
-            }
-            if (lead.getCost() < 0) {
-                throw new IllegalArgumentException("Cost cannot be negative");
-            }
-            if (lead.getGross() < 0) {
-                throw new IllegalArgumentException("Gross cannot be negative");
-            }
-            if (!leadSourceIds.add(lead.getLeadSourceId())) {
-                throw new IllegalArgumentException("Duplicate LeadSource ID found: " + lead.getLeadSourceId());
-            }
+            return response.getBody();
+        } catch (Exception e) {
+            // Handle exception (e.g., log it and return a suitable response or rethrow it)
+            return null;
         }
-    }
-
-    private DealerLeadSourceCostAndGrossEntity mapToEntity(Lead lead, int dealerId) {
-        DealerLeadSourceCostAndGrossEntity entity = new DealerLeadSourceCostAndGrossEntity();
-        entity.setCost(lead.getCost());
-        entity.setGross(lead.getGross());
-        entity.setLeadSourceId(lead.getLeadSourceId());
-        entity.setInternalDealerId(dealerId);
-        return entity;
     }
 }
