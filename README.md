@@ -1,91 +1,127 @@
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
-@Service
-public class DealerServiceImpl implements DealerService {
+import static org.junit.jupiter.api.Assertions.*;
 
-    @Autowired
-    @Qualifier("oAuth2RestTemplate")
+@ExtendWith(MockitoExtension.class)
+public class DealerServiceImplTest {
+
+    @Mock
     private RestTemplate oAuth2RestTemplate;
 
-    @Autowired
+    @Mock
     private ServiceUrlBuilder serviceUrlBuilder;
 
-    @Override
-    public ResponseEntity<String> processDealerData(int dealerId, DealerCostAndGross dealerRequest) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            CommonUtil.setHeaders(headers);
-            HttpEntity<DealerCostAndGross> entity = new HttpEntity<>(dealerRequest, headers);
+    @InjectMocks
+    private DealerServiceImpl dealerService;
 
-            ResponseEntity<String> response = oAuth2RestTemplate.exchange(
-                serviceUrlBuilder.build(Constants.COSTANDGROSS, dealerId),
-                HttpMethod.POST,
-                entity,
-                String.class
-            );
+    private final int dealerId = 1;
+    private final String month = "January";
+    private final int year = 2023;
+    private final int offset = 0;
+    private final int limit = 10;
+    private final DealerCostAndGross dealerRequest = new DealerCostAndGross();
+    private final DealerCostAndGrossResponse dealerResponse = new DealerCostAndGrossResponse();
 
-            return new ResponseEntity<>(response.getBody(), response.getStatusCode());
-        } catch (HttpClientErrorException e) {
-            // Log the client error and return a specific response
-            log.error("Client error occurred while processing the request: {}", e.getMessage());
-            return new ResponseEntity<>("Client error: " + e.getMessage(), e.getStatusCode());
-        } catch (HttpServerErrorException e) {
-            // Log the server error and return a specific response
-            log.error("Server error occurred while processing the request: {}", e.getMessage());
-            return new ResponseEntity<>("Server error: " + e.getMessage(), e.getStatusCode());
-        } catch (Exception e) {
-            // Log the generic error and return a generic response
-            log.error("An unexpected error occurred: {}", e.getMessage());
-            return new ResponseEntity<>("An unexpected error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    @BeforeEach
+    public void setUp() {
+        when(serviceUrlBuilder.build(Constants.COSTANDGROSS, dealerId)).thenReturn("http://localhost:8080/costandgross");
+        when(serviceUrlBuilder.build(Constants.COSTANDGROSSGET, dealerId)).thenReturn("http://localhost:8080/costandgrossget");
     }
 
-    @Override
-    public DealerCostAndGrossResponse getDealerWithLeads(int dealerId, String month, Integer year, int offset, int limit) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            CommonUtil.setHeaders(headers);
-            HttpEntity<?> entity = new HttpEntity<>(headers);
+    @Test
+    public void testProcessDealerData_Success() {
+        when(oAuth2RestTemplate.exchange(
+                eq("http://localhost:8080/costandgross"),
+                eq(HttpMethod.POST),
+                any(HttpEntity.class),
+                eq(String.class)
+        )).thenReturn(new ResponseEntity<>("Success", HttpStatus.OK));
 
-            String url = serviceUrlBuilder.build(Constants.COSTANDGROSSGET, dealerId) +
-                         "?month=" + month +
-                         "&year=" + year +
-                         "&offset=" + offset +
-                         "&limit=" + limit;
+        ResponseEntity<String> response = dealerService.processDealerData(dealerId, dealerRequest);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Success", response.getBody());
+    }
 
-            ResponseEntity<DealerCostAndGrossResponse> response = oAuth2RestTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                entity,
-                DealerCostAndGrossResponse.class
-            );
+    @Test
+    public void testProcessDealerData_ClientError() {
+        when(oAuth2RestTemplate.exchange(
+                eq("http://localhost:8080/costandgross"),
+                eq(HttpMethod.POST),
+                any(HttpEntity.class),
+                eq(String.class)
+        )).thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Client Error"));
 
-            return response.getBody();
-        } catch (HttpClientErrorException e) {
-            // Log the client error and handle it
-            log.error("Client error occurred while processing the request: {}", e.getMessage());
-            // Return a response entity with status code and error message
-            return new DealerCostAndGrossResponse("Client error: " + e.getMessage(), e.getStatusCode());
-        } catch (HttpServerErrorException e) {
-            // Log the server error and handle it
-            log.error("Server error occurred while processing the request: {}", e.getMessage());
-            // Return a response entity with status code and error message
-            return new DealerCostAndGrossResponse("Server error: " + e.getMessage(), e.getStatusCode());
-        } catch (Exception e) {
-            // Log the generic error and handle it
-            log.error("An unexpected error occurred: {}", e.getMessage());
-            // Return a response entity with status code and error message
-            return new DealerCostAndGrossResponse("An unexpected error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        ResponseEntity<String> response = dealerService.processDealerData(dealerId, dealerRequest);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Client Error", response.getBody());
+    }
+
+    @Test
+    public void testProcessDealerData_ServerError() {
+        when(oAuth2RestTemplate.exchange(
+                eq("http://localhost:8080/costandgross"),
+                eq(HttpMethod.POST),
+                any(HttpEntity.class),
+                eq(String.class)
+        )).thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
+
+        ResponseEntity<String> response = dealerService.processDealerData(dealerId, dealerRequest);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals("An error occurred while processing the request.", response.getBody());
+    }
+
+    @Test
+    public void testGetDealerWithLeads_Success() {
+        when(oAuth2RestTemplate.exchange(
+                eq("http://localhost:8080/costandgrossget?month=January&year=2023&offset=0&limit=10"),
+                eq(HttpMethod.GET),
+                any(HttpEntity.class),
+                eq(DealerCostAndGrossResponse.class)
+        )).thenReturn(new ResponseEntity<>(dealerResponse, HttpStatus.OK));
+
+        DealerCostAndGrossResponse response = dealerService.getDealerWithLeads(dealerId, month, year, offset, limit);
+        assertNotNull(response);
+    }
+
+    @Test
+    public void testGetDealerWithLeads_ClientError() {
+        when(oAuth2RestTemplate.exchange(
+                eq("http://localhost:8080/costandgrossget?month=January&year=2023&offset=0&limit=10"),
+                eq(HttpMethod.GET),
+                any(HttpEntity.class),
+                eq(DealerCostAndGrossResponse.class)
+        )).thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Client Error"));
+
+        DealerCostAndGrossResponse response = dealerService.getDealerWithLeads(dealerId, month, year, offset, limit);
+        assertNull(response);
+    }
+
+    @Test
+    public void testGetDealerWithLeads_ServerError() {
+        when(oAuth2RestTemplate.exchange(
+                eq("http://localhost:8080/costandgrossget?month=January&year=2023&offset=0&limit=10"),
+                eq(HttpMethod.GET),
+                any(HttpEntity.class),
+                eq(DealerCostAndGrossResponse.class)
+        )).thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
+
+        DealerCostAndGrossResponse response = dealerService.getDealerWithLeads(dealerId, month, year, offset, limit);
+        assertNull(response);
     }
 }
