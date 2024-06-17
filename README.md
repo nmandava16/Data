@@ -1,12 +1,11 @@
-package com.capitalone.dealernavigator.reporting.business;
+package com.capitalone.dealernavigator.reporting.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
+import com.capitalone.dealernavigator.reporting.business.DealerService;
 import com.capitalone.dealernavigator.reporting.model.DealerCostAndGrossResponse;
-import com.capitalone.dealernavigator.reporting.util.ServiceUrlBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,10 +24,7 @@ import org.springframework.web.client.RestTemplate;
 public class CostAndGrossControllerTest {
 
     @Mock
-    private RestTemplate auth2RestTemplate;
-
-    @Mock
-    private ServiceUrlBuilder serviceUrlBuilder;
+    private DealerService dealerService;
 
     @InjectMocks
     private CostAndGrossController costAndGrossController;
@@ -39,22 +35,12 @@ public class CostAndGrossControllerTest {
     private final int offset = 0;
     private final int limit = 10;
 
-    @BeforeEach
-    public void setup() {
-        costAndGrossController = new CostAndGrossController(auth2RestTemplate, serviceUrlBuilder);
-    }
-
     @Test
-    public void testProcessDealerData_ServerError() {
-        when(auth2RestTemplate.exchange(
-            eq("http://localhost:8080/costandgross"),
-            eq(HttpMethod.POST),
-            any(HttpEntity.class),
-            eq(String.class)
-        )).thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
+    public void testSaveCostAndGrossForLeads_ServerError() {
+        when(dealerService.processDealerData(eq(dealerId), any())).thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
 
         Exception exception = assertThrows(HttpServerErrorException.class, () -> {
-            costAndGrossController.processDealerData(dealerId, null);
+            costAndGrossController.saveCostAndGrossForLeads(dealerId, null);
         });
 
         String expectedMessage = "500 Server Error: [Server Error]";
@@ -64,33 +50,23 @@ public class CostAndGrossControllerTest {
     }
 
     @Test
-    public void testGetDealerWithLeads_Success() {
+    public void testGetCostAndGrossForLeads_Success() {
         DealerCostAndGrossResponse dealerResponse = new DealerCostAndGrossResponse();
-        ResponseEntity<DealerCostAndGrossResponse> responseEntity = new ResponseEntity<>(dealerResponse, HttpStatus.OK);
 
-        when(auth2RestTemplate.exchange(
-            eq("http://localhost:8080/costandgross?month=January&year=2023&offset=0&limit=10"),
-            eq(HttpMethod.GET),
-            any(HttpEntity.class),
-            eq(DealerCostAndGrossResponse.class)
-        )).thenReturn(responseEntity);
+        when(dealerService.getDealerWithLeads(dealerId, month, year, offset, limit)).thenReturn(dealerResponse);
 
-        DealerCostAndGrossResponse response = costAndGrossController.getDealerWithLeads(dealerId, month, year, offset, limit);
+        ResponseEntity<DealerCostAndGrossResponse> response = costAndGrossController.getCostAndGrossForLeads(dealerId, month, year, offset, limit);
 
-        assertNotNull(response);
+        assertNotNull(response.getBody());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
     }
 
     @Test
-    public void testGetDealerWithLeads_ClientError() {
-        when(auth2RestTemplate.exchange(
-            eq("http://localhost:8080/costandgross?month=January&year=2023&offset=0&limit=10"),
-            eq(HttpMethod.GET),
-            any(HttpEntity.class),
-            eq(DealerCostAndGrossResponse.class)
-        )).thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Client Error"));
+    public void testGetCostAndGrossForLeads_ClientError() {
+        when(dealerService.getDealerWithLeads(dealerId, month, year, offset, limit)).thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Client Error"));
 
         Exception exception = assertThrows(HttpClientErrorException.class, () -> {
-            costAndGrossController.getDealerWithLeads(dealerId, month, year, offset, limit);
+            costAndGrossController.getCostAndGrossForLeads(dealerId, month, year, offset, limit);
         });
 
         String expectedMessage = "400 Bad Request: [Client Error]";
@@ -100,21 +76,24 @@ public class CostAndGrossControllerTest {
     }
 
     @Test
-    public void testGetDealerWithLeads_ServerError() {
-        when(auth2RestTemplate.exchange(
-            eq("http://localhost:8080/costandgross?month=January&year=2023&offset=0&limit=10"),
-            eq(HttpMethod.GET),
-            any(HttpEntity.class),
-            eq(DealerCostAndGrossResponse.class)
-        )).thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
+    public void testGetCostAndGrossForLeads_ServerError() {
+        when(dealerService.getDealerWithLeads(dealerId, month, year, offset, limit)).thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
 
         Exception exception = assertThrows(HttpServerErrorException.class, () -> {
-            costAndGrossController.getDealerWithLeads(dealerId, month, year, offset, limit);
+            costAndGrossController.getCostAndGrossForLeads(dealerId, month, year, offset, limit);
         });
 
         String expectedMessage = "500 Server Error: [Server Error]";
         String actualMessage = exception.getMessage();
 
         assertTrue(actualMessage.contains(expectedMessage));
+    }
+
+    @Test
+    public void testGetDealerNotification() {
+        ResponseEntity<String> response = costAndGrossController.getDealerNotification(dealerId);
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNull(response.getBody());
     }
 }
