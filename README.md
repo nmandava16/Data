@@ -1,260 +1,78 @@
+package com.example.controller;
 
-1. Controller Class
-java
-Copy code
-package com.example.bff.controller;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-import com.example.bff.service.DealerService;
-import com.example.bff.model.DealerCostAndGross;
+import com.example.service.DealerService;
+import com.example.model.DealerCostAndGrossResponse;
+import com.example.model.DealerCostAndGrossRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-@RestController
-@RequestMapping("/api/v1")
-public class DealerController {
-
-    private final DealerService dealerService;
+@WebMvcTest(CostAndGrossController.class)
+public class CostAndGrossControllerTest {
 
     @Autowired
-    public DealerController(DealerService dealerService) {
-        this.dealerService = dealerService;
+    private MockMvc mockMvc;
+
+    @MockBean
+    private DealerService dealerService;
+
+    @InjectMocks
+    private CostAndGrossController costAndGrossController;
+
+    private DealerCostAndGrossRequest dealerRequest;
+    private DealerCostAndGrossResponse dealerResponse;
+
+    @BeforeEach
+    public void setUp() {
+        MockitoAnnotations.openMocks(this);
+        dealerRequest = new DealerCostAndGrossRequest();
+        dealerResponse = new DealerCostAndGrossResponse();
     }
 
-    @PostMapping("/dealers/{dealerId}/lead-sources/import-cost-gross-batch")
-    public ResponseEntity<String> saveCostAndGrossForLeads(
-            @RequestBody DealerCostAndGross dealerRequest,
-            @PathVariable("dealerId") int dealerId) {
-        return dealerService.processDealerData(dealerId, dealerRequest);
-    }
-}
-2. Service Class
-java
-Copy code
-package com.example.bff.service;
+    @Test
+    public void testSaveCostAndGrossForLeads() throws Exception {
+        when(dealerService.processDealerData(eq(1), any(DealerCostAndGrossRequest.class)))
+                .thenReturn(dealerResponse);
 
-import com.example.bff.model.DealerCostAndGross;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.RestTemplate;
-
-@Service
-public class DealerService {
-
-    private final RestTemplate restTemplate;
-    private final String backendUrl = "http://your-backend-service-url"; // Replace with your actual backend URL
-
-    @Autowired
-    public DealerService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+        mockMvc.perform(post("/1/lead-sources/import-cost-gross-batch")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(new ObjectMapper().writeValueAsString(dealerRequest)))
+                .andExpect(status().isOk());
     }
 
-    public ResponseEntity<String> processDealerData(int dealerId, DealerCostAndGross dealerRequest) {
-        String backendEndpoint = backendUrl + "/dealerId/marketing/lead-sources/import-cost-gross-batch";
+    @Test
+    public void testGetCostAndGrossForLeads() throws Exception {
+        when(dealerService.getDealerWithLeads(eq(1), eq("month"), eq("year"), eq(0), eq(10)))
+                .thenReturn(dealerResponse);
 
-        try {
-            ResponseEntity<String> response = restTemplate.postForEntity(
-                    backendEndpoint,
-                    dealerRequest,
-                    String.class,
-                    dealerId
-            );
+        mockMvc.perform(get("/1/lead-sources")
+                .param("month", "month")
+                .param("year", "year")
+                .param("offset", "0")
+                .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dealerId").value(dealerResponse.getDealerId()));
+    }
 
-            return new ResponseEntity<>(response.getBody(), response.getStatusCode());
-        } catch (HttpClientErrorException | HttpServerErrorException e) {
-            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while processing the request.");
-        }
+    @Test
+    public void testGetDealerNotification() throws Exception {
+        mockMvc.perform(get("/1/marketing/dealer-notification"))
+                .andExpect(status().isOk());
     }
 }
-3. Model Class
-java
-Copy code
-package com.example.bff.model;
-
-import java.util.List;
-
-public class DealerCostAndGross {
-    private List<LeadSource> leadSources;
-
-    // Getters and Setters
-
-    public List<LeadSource> getLeadSources() {
-        return leadSources;
-    }
-
-    public void setLeadSources(List<LeadSource> leadSources) {
-        this.leadSources = leadSources;
-    }
-
-    public static class LeadSource {
-        private int leadSourceId;
-        private double cost;
-        private double gross;
-
-        // Getters and Setters
-
-        public int getLeadSourceId() {
-            return leadSourceId;
-        }
-
-        public void setLeadSourceId(int leadSourceId) {
-            this.leadSourceId = leadSourceId;
-        }
-
-        public double getCost() {
-            return cost;
-        }
-
-        public void setCost(double cost) {
-            this.cost = cost;
-        }
-
-        public double getGross() {
-            return gross;
-        }
-
-        public void setGross(double gross) {
-            this.gross = gross;
-        }
-    }
-}
-4. RestTemplate Configuration
-If not already configured, you need to configure RestTemplate as a bean in your Spring application.
-
-java
-Copy code
-package com.example.bff.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
-
-@Configuration
-public class AppConfig {
-
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
-}
-5. Application Entry Point
-Make sure you have your main application class to start the Spring Boot application.
-
-java
-Copy code
-package com.example.bff;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class BffApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(BffApplication.class, args);
-    }
-}
-Folder Structure
-css
-Copy code
-src/main/java/com/example/bff/
-    ├── BffApplication.java
-    ├── config/
-    │   └── AppConfig.java
-    ├── controller/
-    │   └── DealerController.java
-    ├── model/
-    │   └── DealerCostAndGross.java
-    └── service/
-        └── DealerService.java
-Dependencies
-Make sure your pom.xml includes the necessary dependencies:
-
-xml
-Copy code
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-web</artifactId>
-</dependency>
-Summary
-This structure ensures that your controller, service, and model classes are properly separated and organized, following the standard practices of a Spring Boot application. This makes the code more maintainable and easier to manage.
-
-package com.example.bff.service.impl;
-
-import com.example.bff.model.DealerCostAndGross;
-import com.example.bff.service.DealerService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.RestTemplate;
-
-@Service
-public class DealerServiceImpl implements DealerService {
-
-    private final RestTemplate restTemplate;
-    private final String backendUrl = "http://your-backend-service-url"; // Replace with your actual backend URL
-
-    @Autowired
-    public DealerServiceImpl(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
-
-    @Override
-    public ResponseEntity<String> processDealerData(int dealerId, DealerCostAndGross dealerRequest) {
-        String backendEndpoint = backendUrl + "/dealerId/marketing/lead-sources/import-cost-gross-batch";
-        
-        try {
-            // Create the HTTP entity with the request body
-            HttpEntity<DealerCostAndGross> entity = new HttpEntity<>(dealerRequest);
-            
-            // Make the POST request using RestTemplate
-            ResponseEntity<String> response = restTemplate.exchange(
-                    backendEndpoint,
-                    HttpMethod.POST,
-                    entity,
-                    String.class,
-                    dealerId
-            );
-
-            // Return the response from the backend service
-            return new ResponseEntity<>(response.getBody(), response.getStatusCode());
-        } catch (HttpClientErrorException | HttpServerErrorException e) {
-            // Return the error response from the backend service
-            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
-        } catch (Exception e) {
-            // Return a generic internal server error response
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while processing the request.");
-        }
-    }
-}
-
-
-@Override
-    public ResponseEntity<String> processDealerData(int dealerId, DealerCostAndGross dealerRequest) {
-        String backendEndpoint = backendUrl + "/dealers/" + dealerId + "/marketing/lead-sources/import-cost-gross-batch";
-
-        try {
-            HttpEntity<DealerCostAndGross> entity = new HttpEntity<>(dealerRequest);
-            ResponseEntity<String> response = restTemplate.exchange(
-                    backendEndpoint,
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-            return new ResponseEntity<>(response.getBody(), response.getStatusCode());
-
-
-
-
-
-
